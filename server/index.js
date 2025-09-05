@@ -9,15 +9,11 @@ const PORT = process.env.PORT || 5001;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('.'));
 
-// Health check endpoint
+// Serve the main HTML file
 app.get('/', (req, res) => {
-    res.json({ 
-        message: 'ResearchBot API is running!', 
-        status: 'healthy',
-        version: '1.0.0'
-    });
+    res.sendFile(__dirname + '/../index.html');
 });
 
 // Chat endpoint
