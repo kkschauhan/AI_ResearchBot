@@ -2,11 +2,33 @@
 // Free cloud-based research tools
 
 const axios = require('axios');
-const { createClient } = require('@supabase/supabase-js');
-const { SUPABASE_CONFIG, FREE_APIS } = require('../supabase-config');
 
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+// Initialize Supabase client with fallback
+let supabase = null;
+let FREE_APIS = null;
+
+try {
+    const { createClient } = require('@supabase/supabase-js');
+    const { SUPABASE_CONFIG, FREE_APIS: configAPIs } = require('../supabase-config');
+    
+    if (SUPABASE_CONFIG.url && SUPABASE_CONFIG.url !== 'YOUR_SUPABASE_URL') {
+        supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+        FREE_APIS = configAPIs;
+    } else {
+        console.log('Supabase not configured, using mock data');
+    }
+} catch (error) {
+    console.log('Supabase not configured, using mock data:', error.message);
+}
+
+// Fallback APIs configuration
+if (!FREE_APIS) {
+    FREE_APIS = {
+        arxiv: 'http://export.arxiv.org/api/query',
+        pubmed: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/',
+        openalex: 'https://api.openalex.org/works'
+    };
+}
 
 // Enhanced chat endpoint with real functionality
 module.exports = async (req, res) => {
@@ -152,38 +174,80 @@ async function handleAction(action, data, userId) {
 // Search papers using free APIs
 async function searchPapers(query, userId) {
     try {
-        // Search arXiv (free)
-        const arxivResponse = await axios.get(FREE_APIS.arxiv, {
-            params: {
-                search_query: query,
-                start: 0,
-                max_results: 5,
-                sortBy: 'relevance',
-                sortOrder: 'descending'
-            }
-        });
+        console.log('Searching papers for:', query);
         
-        const papers = parseArxivResponse(arxivResponse.data);
-        
-        // Save papers to database
-        for (const paper of papers) {
-            try {
-                await supabase
-                    .from('papers')
-                    .insert({
-                        ...paper,
-                        user_id: userId
-                    });
-            } catch (dbError) {
-                console.log('Paper already exists or DB error:', dbError.message);
+        // Try to search arXiv (free)
+        try {
+            const arxivResponse = await axios.get(FREE_APIS.arxiv, {
+                params: {
+                    search_query: query,
+                    start: 0,
+                    max_results: 5,
+                    sortBy: 'relevance',
+                    sortOrder: 'descending'
+                }
+            });
+            
+            const papers = parseArxivResponse(arxivResponse.data);
+            
+            // Save papers to database if available
+            if (supabase) {
+                for (const paper of papers) {
+                    try {
+                        await supabase
+                            .from('papers')
+                            .insert({
+                                ...paper,
+                                user_id: userId
+                            });
+                    } catch (dbError) {
+                        console.log('Paper already exists or DB error:', dbError.message);
+                    }
+                }
             }
+            
+            return {
+                success: true,
+                papers: papers,
+                message: `Found ${papers.length} papers for "${query}"`
+            };
+        } catch (apiError) {
+            console.log('arXiv API error, using mock data:', apiError.message);
+            
+            // Return mock data if API fails
+            const mockPapers = [
+                {
+                    title: `Machine Learning Applications in ${query}`,
+                    authors: ['Smith, J.', 'Johnson, A.', 'Brown, M.'],
+                    abstract: `This paper presents novel machine learning techniques applied to ${query}. We demonstrate significant improvements in accuracy and efficiency through our proposed methodology.`,
+                    publication_date: '2024-01-15',
+                    source: 'arXiv',
+                    arxiv_id: '2401.12345'
+                },
+                {
+                    title: `Deep Learning Approaches for ${query} Analysis`,
+                    authors: ['Wilson, K.', 'Davis, L.'],
+                    abstract: `We propose a deep learning framework for analyzing ${query} with applications in real-world scenarios. Our approach achieves state-of-the-art performance.`,
+                    publication_date: '2024-01-10',
+                    source: 'arXiv',
+                    arxiv_id: '2401.12346'
+                },
+                {
+                    title: `Neural Networks in ${query}: A Comprehensive Survey`,
+                    authors: ['Garcia, R.', 'Lee, S.', 'Chen, W.'],
+                    abstract: `This survey paper reviews recent advances in neural network applications for ${query}, covering both theoretical foundations and practical implementations.`,
+                    publication_date: '2024-01-05',
+                    source: 'arXiv',
+                    arxiv_id: '2401.12347'
+                }
+            ];
+            
+            return {
+                success: true,
+                papers: mockPapers,
+                message: `Found ${mockPapers.length} sample papers for "${query}" (using demo data)`
+            };
         }
-        
-        return {
-            success: true,
-            papers: papers,
-            message: `Found ${papers.length} papers for "${query}"`
-        };
     } catch (error) {
         console.error('Search papers error:', error);
         return { 
@@ -244,25 +308,44 @@ function extractXmlValues(xml, tag) {
 // Create milestone
 async function createMilestone(data, userId) {
     try {
-        const { data: milestone, error } = await supabase
-            .from('milestones')
-            .insert({
+        if (supabase) {
+            const { data: milestone, error } = await supabase
+                .from('milestones')
+                .insert({
+                    title: data.title,
+                    description: data.description || '',
+                    due_date: data.due_date || null,
+                    priority: data.priority || 'medium',
+                    user_id: userId
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            return {
+                success: true,
+                milestone: milestone,
+                message: 'Milestone created successfully'
+            };
+        } else {
+            // Mock milestone creation
+            const milestone = {
+                id: Date.now().toString(),
                 title: data.title,
                 description: data.description || '',
                 due_date: data.due_date || null,
                 priority: data.priority || 'medium',
-                user_id: userId
-            })
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        return {
-            success: true,
-            milestone: milestone,
-            message: 'Milestone created successfully'
-        };
+                user_id: userId,
+                created_at: new Date().toISOString()
+            };
+            
+            return {
+                success: true,
+                milestone: milestone,
+                message: 'Milestone created successfully (demo mode)'
+            };
+        }
     } catch (error) {
         console.error('Create milestone error:', error);
         return { error: 'Failed to create milestone' };
@@ -272,25 +355,44 @@ async function createMilestone(data, userId) {
 // Add note
 async function addNote(data, userId) {
     try {
-        const { data: note, error } = await supabase
-            .from('notes')
-            .insert({
+        if (supabase) {
+            const { data: note, error } = await supabase
+                .from('notes')
+                .insert({
+                    title: data.title,
+                    content: data.content,
+                    paper_id: data.paper_id || null,
+                    tags: data.tags || [],
+                    user_id: userId
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            return {
+                success: true,
+                note: note,
+                message: 'Note added successfully'
+            };
+        } else {
+            // Mock note creation
+            const note = {
+                id: Date.now().toString(),
                 title: data.title,
                 content: data.content,
                 paper_id: data.paper_id || null,
                 tags: data.tags || [],
-                user_id: userId
-            })
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        return {
-            success: true,
-            note: note,
-            message: 'Note added successfully'
-        };
+                user_id: userId,
+                created_at: new Date().toISOString()
+            };
+            
+            return {
+                success: true,
+                note: note,
+                message: 'Note added successfully (demo mode)'
+            };
+        }
     } catch (error) {
         console.error('Add note error:', error);
         return { error: 'Failed to add note' };
@@ -300,25 +402,46 @@ async function addNote(data, userId) {
 // Format citation
 async function formatCitation(data, userId) {
     try {
-        const { data: citation, error } = await supabase
-            .from('citations')
-            .insert({
+        const formattedCitation = formatCitationText(data.citation_text, data.style || 'APA');
+        
+        if (supabase) {
+            const { data: citation, error } = await supabase
+                .from('citations')
+                .insert({
+                    paper_id: data.paper_id || null,
+                    citation_text: data.citation_text,
+                    citation_style: data.style || 'APA',
+                    formatted_citation: formattedCitation,
+                    user_id: userId
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            return {
+                success: true,
+                citation: citation,
+                message: 'Citation formatted and saved'
+            };
+        } else {
+            // Mock citation creation
+            const citation = {
+                id: Date.now().toString(),
                 paper_id: data.paper_id || null,
                 citation_text: data.citation_text,
                 citation_style: data.style || 'APA',
-                formatted_citation: formatCitationText(data.citation_text, data.style || 'APA'),
-                user_id: userId
-            })
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        return {
-            success: true,
-            citation: citation,
-            message: 'Citation formatted and saved'
-        };
+                formatted_citation: formattedCitation,
+                user_id: userId,
+                created_at: new Date().toISOString()
+            };
+            
+            return {
+                success: true,
+                citation: citation,
+                message: 'Citation formatted and saved (demo mode)'
+            };
+        }
     } catch (error) {
         console.error('Format citation error:', error);
         return { error: 'Failed to format citation' };
@@ -417,29 +540,51 @@ async function handleFileUpload(req, res, userId) {
             conclusions: 'Main conclusions and implications of the research'
         };
 
-        // Save to database
-        const { data: paper, error } = await supabase
-            .from('papers')
-            .insert({
+        if (supabase) {
+            // Save to database
+            const { data: paper, error } = await supabase
+                .from('papers')
+                .insert({
+                    title: paperData.title,
+                    authors: paperData.authors,
+                    abstract: paperData.abstract,
+                    summary: paperData.summary,
+                    user_id: userId,
+                    source: 'uploaded_pdf'
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            res.json({
+                success: true,
+                paper: paper,
+                summary: paperData.summary,
+                keyFindings: paperData.keyFindings,
+                message: 'Paper uploaded and analyzed successfully'
+            });
+        } else {
+            // Mock paper creation
+            const paper = {
+                id: Date.now().toString(),
                 title: paperData.title,
                 authors: paperData.authors,
                 abstract: paperData.abstract,
                 summary: paperData.summary,
                 user_id: userId,
-                source: 'uploaded_pdf'
-            })
-            .select()
-            .single();
+                source: 'uploaded_pdf',
+                created_at: new Date().toISOString()
+            };
 
-        if (error) throw error;
-
-        res.json({
-            success: true,
-            paper: paper,
-            summary: paperData.summary,
-            keyFindings: paperData.keyFindings,
-            message: 'Paper uploaded and analyzed successfully'
-        });
+            res.json({
+                success: true,
+                paper: paper,
+                summary: paperData.summary,
+                keyFindings: paperData.keyFindings,
+                message: 'Paper uploaded and analyzed successfully (demo mode)'
+            });
+        }
 
     } catch (error) {
         console.error('File upload error:', error);
