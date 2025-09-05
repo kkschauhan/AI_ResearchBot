@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ResearchBot API Test</title>
+</head>
+<body>
+    <h1>ResearchBot API Test</h1>
+    <button onclick="testPaperSearch()">Test Paper Search</button>
+    <button onclick="testCreateMilestone()">Test Create Milestone</button>
+    <button onclick="testAddNote()">Test Add Note</button>
+    <button onclick="testFormatCitation()">Test Format Citation</button>
+    
+    <div id="results"></div>
+
+    <script>
+        async function testPaperSearch() {
+            try {
+                const response = await fetch('/api/enhanced-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        action: 'search_papers',
+                        data: { query: 'machine learning' },
+                        userId: 'test-user'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('results').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function testCreateMilestone() {
+            try {
+                const response = await fetch('/api/enhanced-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        action: 'create_milestone',
+                        data: { 
+                            title: 'Test Milestone',
+                            description: 'This is a test milestone',
+                            due_date: '2024-12-31'
+                        },
+                        userId: 'test-user'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('results').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function testAddNote() {
+            try {
+                const response = await fetch('/api/enhanced-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        action: 'add_note',
+                        data: { 
+                            title: 'Test Note',
+                            content: 'This is a test note'
+                        },
+                        userId: 'test-user'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('results').innerHTML = 'Error: ' + error.message;
+            }
+        }
+
+        async function testFormatCitation() {
+            try {
+                const response = await fetch('/api/enhanced-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        action: 'format_citation',
+                        data: { 
+                            citation_text: 'Smith, J. (2023). Machine Learning in Healthcare. Journal of AI.',
+                            style: 'APA'
+                        },
+                        userId: 'test-user'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('results').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

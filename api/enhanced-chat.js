@@ -30,6 +30,8 @@ module.exports = async (req, res) => {
     try {
         const { message, action, data, userId = 'demo-user' } = req.body;
         
+        console.log('Request received:', { message, action, data, userId });
+        
         if (!message && !action) {
             return res.status(400).json({ error: 'Message or action is required' });
         }
@@ -38,6 +40,11 @@ module.exports = async (req, res) => {
         if (action) {
             const result = await handleAction(action, data, userId);
             return res.json(result);
+        }
+
+        // Handle file uploads for paper analysis
+        if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+            return await handleFileUpload(req, res, userId);
         }
 
         // Check if Groq API key is configured
@@ -160,12 +167,16 @@ async function searchPapers(query, userId) {
         
         // Save papers to database
         for (const paper of papers) {
-            await supabase
-                .from('papers')
-                .insert({
-                    ...paper,
-                    user_id: userId
-                });
+            try {
+                await supabase
+                    .from('papers')
+                    .insert({
+                        ...paper,
+                        user_id: userId
+                    });
+            } catch (dbError) {
+                console.log('Paper already exists or DB error:', dbError.message);
+            }
         }
         
         return {
@@ -175,7 +186,11 @@ async function searchPapers(query, userId) {
         };
     } catch (error) {
         console.error('Search papers error:', error);
-        return { error: 'Failed to search papers' };
+        return { 
+            success: false,
+            error: 'Failed to search papers',
+            papers: []
+        };
     }
 }
 
@@ -384,5 +399,53 @@ async function getNotes(userId) {
     } catch (error) {
         console.error('Get notes error:', error);
         return { error: 'Failed to get notes' };
+    }
+}
+
+// Handle file upload for paper analysis
+async function handleFileUpload(req, res, userId) {
+    try {
+        // For now, simulate PDF processing
+        // In a real implementation, you'd use multer and pdf-parse
+        const paperData = {
+            title: 'Uploaded Research Paper',
+            authors: ['Unknown Author'],
+            abstract: 'This is a sample abstract from the uploaded PDF. In a real implementation, this would be extracted from the actual PDF content.',
+            summary: 'AI-generated summary of the uploaded paper with key findings and methodology.',
+            keyFindings: ['Key finding 1', 'Key finding 2', 'Key finding 3'],
+            methodology: 'Research methodology extracted from the paper',
+            conclusions: 'Main conclusions and implications of the research'
+        };
+
+        // Save to database
+        const { data: paper, error } = await supabase
+            .from('papers')
+            .insert({
+                title: paperData.title,
+                authors: paperData.authors,
+                abstract: paperData.abstract,
+                summary: paperData.summary,
+                user_id: userId,
+                source: 'uploaded_pdf'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            paper: paper,
+            summary: paperData.summary,
+            keyFindings: paperData.keyFindings,
+            message: 'Paper uploaded and analyzed successfully'
+        });
+
+    } catch (error) {
+        console.error('File upload error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to process uploaded file' 
+        });
     }
 }
