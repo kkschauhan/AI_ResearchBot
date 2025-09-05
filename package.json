@@ -2,12 +2,12 @@
   "name": "researchbot",
   "version": "1.0.0",
   "description": "AI-Powered Research Assistant for PhD Students",
-  "main": "server/index.js",
+  "main": "api/chat.js",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "build": "npm run build:client",
-    "build:client": "echo 'Client build completed'",
+    "start": "node api/chat.js",
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "build:client": "echo 'No client build required'",
     "test": "jest",
     "lint": "eslint .",
     "format": "prettier --write ."
