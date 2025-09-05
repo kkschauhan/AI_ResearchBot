@@ -8,6 +8,14 @@
   ],
   "routes": [
     {
+      "src": "/api/chat",
+      "dest": "/api/enhanced-chat.js"
+    },
+    {
+      "src": "/api/enhanced-chat",
+      "dest": "/api/enhanced-chat.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/enhanced-chat.js"
     },
