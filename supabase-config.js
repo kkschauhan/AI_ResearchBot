@@ -1,11 +1,14 @@
 // Supabase Configuration for ResearchBot
-// Replace these with your actual Supabase project credentials
+const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_CONFIG = {
-  url: 'YOUR_SUPABASE_URL', // Get from Supabase dashboard
-  anonKey: 'YOUR_SUPABASE_ANON_KEY', // Get from Supabase dashboard
-  serviceKey: 'YOUR_SUPABASE_SERVICE_KEY' // Get from Supabase dashboard (for server-side)
+  url: process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL',
+  anonKey: process.env.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY',
+  serviceKey: process.env.SUPABASE_SERVICE_KEY || 'YOUR_SUPABASE_SERVICE_KEY'
 };
+
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
 
 // Free API endpoints for research papers
 const FREE_APIS = {
@@ -56,6 +59,7 @@ const PROJECT_STATUS = {
 };
 
 module.exports = {
+  supabase,
   SUPABASE_CONFIG,
   FREE_APIS,
   CITATION_STYLES,
